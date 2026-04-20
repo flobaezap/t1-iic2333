@@ -3,6 +3,48 @@
 #include <string.h>
 #include <stdbool.h>
 
+typedef enum {
+    READY,
+    RUNNING,
+    WAITING,
+    FINISHED,
+    DEAD,
+    NOT_ARRIVED
+} State;
+
+typedef struct {
+    char name[20];
+    int pid;
+    int t_inicio;      
+    int t_cpu_burst;      
+    int n_bursts;      
+    int io_wait;         
+    int t_deadline;        
+    State state;
+    int rafagas_completadas;       
+    int progreso_rafaga_actual; 
+    int progreso_io_actual;   
+    int quantum_consumido;       
+    int t_lcpu;          
+    int first_time_cpu;         
+    int waiting_time;           
+    int interrupciones;          
+} Process;
+
+typedef struct {
+    Process **procesos; 
+    int tamaño;            
+    int capacidad;        
+} Queue;
+
+Queue* crear_queue(int capacidad) {
+    Queue *q = (Queue*)malloc(sizeof(Queue));
+    q->procesos = (Process**)malloc(sizeof(Process*) * capacidad);
+    q->tamaño = 0;
+    q->capacidad = capacidad;
+    return q;
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 3) {
         printf("Uso: %s <input_file> <output_file>\n", argv[0]);
