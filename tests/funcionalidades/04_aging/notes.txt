@@ -1,0 +1,10 @@
+aging_threshold=2; P0 monopolises CPU while P1-P4 wait in Low and get rapidly aged.
+
+quantum=3  aging_threshold=2  n=5
+
+Processes (name pid start burst_time n_bursts io_wait deadline):
+  P0 0 0 10 1 0 60
+  P1 1 0 3 1 0 50
+  P2 2 0 3 1 0 55
+  P3 3 0 2 1 0 45
+  P4 4 0 4 1 0 40

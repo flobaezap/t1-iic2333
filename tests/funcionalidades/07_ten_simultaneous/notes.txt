@@ -1,0 +1,15 @@
+10 processes all arrive at t=0; exercises EDF ordering and RR fairness at scale.
+
+quantum=3  aging_threshold=20  n=10
+
+Processes (name pid start burst_time n_bursts io_wait deadline):
+  P0 0 0 3 1 0 30
+  P1 1 0 2 1 0 10
+  P2 2 0 4 1 0 25
+  P3 3 0 1 1 0 8
+  P4 4 0 3 1 0 20
+  P5 5 0 5 1 0 35
+  P6 6 0 2 1 0 15
+  P7 7 0 4 1 0 40
+  P8 8 0 3 1 0 12
+  P9 9 0 2 1 0 18

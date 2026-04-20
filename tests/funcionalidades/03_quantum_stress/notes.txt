@@ -1,0 +1,12 @@
+quantum=2 with 7 long-burst processes; heavy quantum exhaustion and Low-queue demotion.
+
+quantum=2  aging_threshold=20  n=7
+
+Processes (name pid start burst_time n_bursts io_wait deadline):
+  P0 0 0 6 1 0 60
+  P1 1 1 5 1 0 55
+  P2 2 2 4 1 0 50
+  P3 3 0 7 1 0 70
+  P4 4 3 3 1 0 45
+  P5 5 5 4 1 0 60
+  P6 6 1 6 1 0 65

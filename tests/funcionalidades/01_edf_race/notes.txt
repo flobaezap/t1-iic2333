@@ -1,0 +1,10 @@
+5 processes arrive at t=0; pure EDF ordering, no I/O, quantum=3.
+
+quantum=3  aging_threshold=10  n=5
+
+Processes (name pid start burst_time n_bursts io_wait deadline):
+  P0 0 0 2 1 0 20
+  P1 1 0 3 1 0 8
+  P2 2 0 4 1 0 15
+  P3 3 0 2 1 0 6
+  P4 4 0 1 1 0 12

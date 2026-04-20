@@ -1,0 +1,11 @@
+6 processes arrive one per tick; each has a tighter deadline, causing cascading preemptions.
+
+quantum=5  aging_threshold=15  n=6
+
+Processes (name pid start burst_time n_bursts io_wait deadline):
+  P0 0 0 8 1 0 50
+  P1 1 1 4 1 0 20
+  P2 2 2 3 1 0 15
+  P3 3 3 2 1 0 12
+  P4 4 4 3 1 0 18
+  P5 5 5 5 1 0 30

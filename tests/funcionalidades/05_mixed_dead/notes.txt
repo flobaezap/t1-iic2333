@@ -1,0 +1,13 @@
+8 processes; some have deadlines too tight to ever run — mixes DEAD and FINISHED.
+
+quantum=4  aging_threshold=10  n=8
+
+Processes (name pid start burst_time n_bursts io_wait deadline):
+  P0 0 0 3 1 0 5
+  P1 1 0 2 1 0 30
+  P2 2 1 4 1 0 7
+  P3 3 2 3 1 0 25
+  P4 4 0 5 1 0 8
+  P5 5 3 2 1 0 35
+  P6 6 1 3 1 0 40
+  P7 7 4 2 1 0 20
