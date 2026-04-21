@@ -28,6 +28,7 @@ typedef struct {
     int first_time_cpu;         
     int waiting_time;           
     int interrupciones;          
+    int turnaround_time;
 } Process;
 
 typedef struct {
@@ -126,6 +127,7 @@ int main(int argc, char *argv[]) {
         p->first_time_cpu = -1;
         p->waiting_time = 0;
         p->interrupciones = 0;
+        p->turnaround_time = 0;
         todos_los_procesos[i] = p;
     }
 
@@ -135,6 +137,7 @@ int main(int argc, char *argv[]) {
     Process *cpu_running = NULL; 
     int procesos_terminados = 0; 
     int tick = 0;
+    bool comes_from_high = true;
 
     // Completa el codigo. Exito :D
 
@@ -177,6 +180,22 @@ int main(int argc, char *argv[]) {
             }
         }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         // Falta implementar
         // 1. Re-ordenar colas por deadline, EDF (punto 5 del flujo del scheduler)
         // El punto 2. y 3. son parte del punto 6 y 7 del flujo del scheduler por si acaso
@@ -186,6 +205,69 @@ int main(int argc, char *argv[]) {
         // 4. Registrar los tiempos Turnaround, Response y waiting.
         // 5. Generar el output .csv
 
+        // re-ordenar colas por deadline 
+        qsort(cola_high->procesos, cola_high->size, sizeof(Process*), comparacion_edf);
+        qsort(cola_low->procesos, cola_low->size, sizeof(Process*), comparacion_edf);
+
+        // ejecucion en cpu
+        if (cpu_running != NULL) {
+            cpu_running->progreso_rafaga_actual++;
+            if (comes_from_high) {
+                cpu_running->quantum_consumido++;
+            }
+
+            bool termino_rafaga = (cpu_running->progreso_rafaga_actual == cpu_running->t_cpu_burst);
+            bool es_ultima_rafaga = (cpu_running->rafagas_completadas + 1 == cpu_running->n_bursts);
+            bool llego_deadline = (tick >= cpu_running->t_deadline);
+            bool fin_quantum = (comes_from_high && cpu_running->quantum_consumido >= q);
+
+            // ejecuta rafaga entera
+            if ((termino_rafaga && es_ultima_rafaga) || llego_deadline) {
+                if (termino_rafaga && es_ultima_rafaga) {
+                    cpu_running->state = FINISHED;
+                } else {
+                    cpu_running->state = DEAD;
+                }
+                cpu_running->turnaround_time = tick - cpu_running->t_inicio;
+                cpu_running->t_lcpu = tick;
+                procesos_terminados++;
+                cpu_running = NULL;
+            } 
+            // fin de rafaga
+            else if (termino_rafaga) {
+                cpu_running->rafagas_completadas++;
+                cpu_running->progreso_rafaga_actual = 0;
+                
+                if (cpu_running->io_wait == 0) {
+                    cpu_running->state = READY;
+                    insertar_en_queue(cola_high, cpu_running);
+                } else {
+                    cpu_running->state = WAITING;
+                }
+                cpu_running->t_lcpu = tick;
+                cpu_running = NULL;
+            } 
+            // consume todo el quantum
+            else if (fin_quantum) {
+                cpu_running->state = READY;
+                insertar_en_queue(cola_low, cpu_running);
+                cpu_running->t_lcpu = tick;
+                cpu_running = NULL;
+            } 
+            // interrupcion por prioridad
+            else if (comes_from_high && cola_high->size > 0) {
+                continue;
+            }
+        }
+
+        // si cpu esta libre, sacar de high o low
+        if (cpu_running == NULL) {
+            continue;
+        }
+
+
+
+
         for (int i = 0; i < nProcesses; i++) {
             if (todos_los_procesos[i]->state == READY) {
                 todos_los_procesos[i]->waiting_time++;
@@ -194,6 +276,20 @@ int main(int argc, char *argv[]) {
         tick++;
     }
 
+    // imprimir output csv 
+    for (int i = 0; i < nProcesses; i++) {
+        Process *p = todos_los_procesos[i];
+        int response_time = p->first_time_cpu - p->t_inicio;
+        const char *state_str = (p->state == FINISHED) ? "FINISHED" : "DEAD";
+        fprintf(out, "%s,%d,%s,%d,%d,%d,%d\n", 
+                p->name, 
+                p->pid, 
+                state_str, 
+                p->interrupciones, 
+                p->turnaround_time, 
+                response_time, 
+                p->waiting_time);
+    }
     fclose(out);
     liberar_queue(cola_high);
     liberar_queue(cola_low);
