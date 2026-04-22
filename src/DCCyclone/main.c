@@ -78,6 +78,52 @@ int comparacion_edf(const void *a, const void *b) {
     return p1->pid - p2->pid; // en caso de empate, menor PID
 }
 
+// decide si el proceso debe ser preemptado por prioridad
+bool debe_preemptar(Process *cpu_running, Queue *cola_high, bool comes_from_high) {
+    if (cpu_running == NULL || cola_high->size == 0) return false;
+    if (!comes_from_high) return true; 
+    Process *top = cola_high->procesos[0];
+    if (top->t_deadline < cpu_running->t_deadline) return true;
+    if (top->t_deadline == cpu_running->t_deadline && top->pid < cpu_running->pid) return true;
+    return false;
+}
+
+// saca proceso de la CPU a donde estaba
+void preemptar_cpu(Process **cpu_running, Queue *cola_high, Queue *cola_low, bool comes_from_high, int tick) {
+    Process *p = *cpu_running;
+    p->state = READY;
+    p->interrupciones++;
+    p->t_lcpu = tick;
+    if (comes_from_high) {
+        insertar_en_queue(cola_high, p);
+    } else {
+        insertar_en_queue(cola_low, p);
+    }
+    *cpu_running = NULL;
+}
+
+// elige proximo proceso a ejecutar
+void dispatch_cpu(Process **cpu_running, Queue *cola_high, Queue *cola_low, bool *comes_from_high, int tick) {
+    if (*cpu_running != NULL) return;
+    Process *elegido = NULL;
+    if (cola_high->size > 0) {
+        elegido = cola_high->procesos[0];
+        eliminar_de_queue(cola_high, elegido);
+        *comes_from_high = true;
+    } else if (cola_low->size > 0) {
+        elegido = cola_low->procesos[0];
+        eliminar_de_queue(cola_low, elegido);
+        *comes_from_high = false;
+    }
+    if (elegido != NULL) {
+        elegido->state = RUNNING;
+        if (elegido->first_time_cpu == -1) {
+            elegido->first_time_cpu = tick;
+        }
+        *cpu_running = elegido;
+    }
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 3) {
         printf("Uso: %s <input_file> <output_file>\n", argv[0]);
@@ -139,8 +185,6 @@ int main(int argc, char *argv[]) {
     int tick = 0;
     bool comes_from_high = true;
 
-    // Completa el codigo. Exito :D
-
     while (procesos_terminados < nProcesses) {
         
         for (int i = 0; i < nProcesses; i++) {
@@ -174,36 +218,12 @@ int main(int argc, char *argv[]) {
             Process *p = todos_los_procesos[i];
             if (tick >= p->t_deadline && (p->state == READY || p->state == WAITING)) {
                 p->state = DEAD;
+                p->turnaround_time = tick - p->t_inicio;
                 procesos_terminados++; 
                 eliminar_de_queue(cola_high, p);
                 eliminar_de_queue(cola_low, p);
             }
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        // Falta implementar
-        // 1. Re-ordenar colas por deadline, EDF (punto 5 del flujo del scheduler)
-        // El punto 2. y 3. son parte del punto 6 y 7 del flujo del scheduler por si acaso
-        // 2. Trabajar con el cpu_running. Por ejemplo, si un proceso que está RUNNING en la CPU termina su ráfaga actual y aún le quedan ráfagas por hacer, entonces el Scheduler dice: "Terminaste esta ráfaga de CPU, ahora anda a hacer I/O", lo cambia a estado WAITING, lo saca de la CPU, y guarda su t_lcpu = tick (la última vez que salió de la CPU)
-        // 2.1 Lo otro, tener en consideración que si cpu_running->io_wait == 0, entonces el proceso vuelve a Ready y a la cola High
-        // 3. Si CPU está vacía, sacar de High o Low
-        // 4. Registrar los tiempos Turnaround, Response y waiting.
-        // 5. Generar el output .csv
 
         // re-ordenar colas por deadline 
         qsort(cola_high->procesos, cola_high->size, sizeof(Process*), comparacion_edf);
@@ -222,17 +242,22 @@ int main(int argc, char *argv[]) {
             bool fin_quantum = (comes_from_high && cpu_running->quantum_consumido >= q);
 
             // ejecuta rafaga entera
-            if ((termino_rafaga && es_ultima_rafaga) || llego_deadline) {
-                if (termino_rafaga && es_ultima_rafaga) {
-                    cpu_running->state = FINISHED;
-                } else {
-                    cpu_running->state = DEAD;
-                }
+            if (termino_rafaga && es_ultima_rafaga) {
+                cpu_running->state = FINISHED;
                 cpu_running->turnaround_time = tick - cpu_running->t_inicio;
                 cpu_running->t_lcpu = tick;
                 procesos_terminados++;
                 cpu_running = NULL;
-            } 
+            }
+            // deadline alcanzado a mitad de rafaga
+            else if (llego_deadline) {
+                cpu_running->state = DEAD;
+                cpu_running->interrupciones++;
+                cpu_running->turnaround_time = tick - cpu_running->t_inicio;
+                cpu_running->t_lcpu = tick;
+                procesos_terminados++;
+                cpu_running = NULL;
+            }
             // fin de rafaga
             else if (termino_rafaga) {
                 cpu_running->rafagas_completadas++;
@@ -250,27 +275,25 @@ int main(int argc, char *argv[]) {
             // consume todo el quantum
             else if (fin_quantum) {
                 cpu_running->state = READY;
+                cpu_running->interrupciones++;
                 insertar_en_queue(cola_low, cpu_running);
                 cpu_running->t_lcpu = tick;
                 cpu_running = NULL;
             } 
             // interrupcion por prioridad
-            else if (comes_from_high && cola_high->size > 0) {
-                continue;
+            else if (debe_preemptar(cpu_running, cola_high, comes_from_high)) {
+                preemptar_cpu(&cpu_running, cola_high, cola_low, comes_from_high, tick);
             }
         }
 
         // si cpu esta libre, sacar de high o low
-        if (cpu_running == NULL) {
-            continue;
-        }
-
-
-
+        dispatch_cpu(&cpu_running, cola_high, cola_low, &comes_from_high, tick);
 
         for (int i = 0; i < nProcesses; i++) {
-            if (todos_los_procesos[i]->state == READY) {
-                todos_los_procesos[i]->waiting_time++;
+            Process *p = todos_los_procesos[i];
+            if (tick < p->t_inicio) continue; // proceso aun no nace
+            if (p->state == READY || p->state == WAITING) {
+                p->waiting_time++;
             }
         }
         tick++;
@@ -279,7 +302,7 @@ int main(int argc, char *argv[]) {
     // imprimir output csv 
     for (int i = 0; i < nProcesses; i++) {
         Process *p = todos_los_procesos[i];
-        int response_time = p->first_time_cpu - p->t_inicio;
+        int response_time = (p->first_time_cpu == -1) ? 0 : (p->first_time_cpu - p->t_inicio);
         const char *state_str = (p->state == FINISHED) ? "FINISHED" : "DEAD";
         fprintf(out, "%s,%d,%s,%d,%d,%d,%d\n", 
                 p->name, 
