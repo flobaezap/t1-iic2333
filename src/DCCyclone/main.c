@@ -79,12 +79,21 @@ int comparacion_edf(const void *a, const void *b) {
 }
 
 // decide si el proceso debe ser preemptado por prioridad
-bool debe_preemptar(Process *cpu_running, Queue *cola_high, bool comes_from_high) {
+bool debe_preemptar(Process *cpu_running, Queue *cola_high, Queue *cola_low, bool comes_from_high) {
     if (cpu_running == NULL || cola_high->size == 0) return false;
-    if (!comes_from_high) return true; 
-    Process *top = cola_high->procesos[0];
-    if (top->t_deadline < cpu_running->t_deadline) return true;
-    if (top->t_deadline == cpu_running->t_deadline && top->pid < cpu_running->pid) return true;
+    if (cola_high->size > 0) {    
+        if (!comes_from_high) return true; 
+        Process *top = cola_high->procesos[0];
+        if (top->t_deadline < cpu_running->t_deadline) return true;
+        if (top->t_deadline == cpu_running->t_deadline && top->pid < cpu_running->pid) return true;
+    }
+
+    if (!comes_from_high && cola_low->size > 0) {   
+        Process *top = cola_low->procesos[0];
+        if (top->t_deadline < cpu_running->t_deadline) return true;
+        if (top->t_deadline == cpu_running->t_deadline && top->pid < cpu_running->pid) return true;
+    }
+    
     return false;
 }
 
@@ -262,7 +271,9 @@ int main(int argc, char *argv[]) {
             else if (termino_rafaga) {
                 cpu_running->rafagas_completadas++;
                 cpu_running->progreso_rafaga_actual = 0;
-                
+                if (!comes_from_high) {
+                    cpu_running->quantum_consumido = 0; 
+                }
                 if (cpu_running->io_wait == 0) {
                     cpu_running->state = READY;
                     insertar_en_queue(cola_high, cpu_running);
@@ -281,7 +292,7 @@ int main(int argc, char *argv[]) {
                 cpu_running = NULL;
             } 
             // interrupcion por prioridad
-            else if (debe_preemptar(cpu_running, cola_high, comes_from_high)) {
+            else if (debe_preemptar(cpu_running, cola_high, cola_low,comes_from_high)) {
                 preemptar_cpu(&cpu_running, cola_high, cola_low, comes_from_high, tick);
             }
         }
