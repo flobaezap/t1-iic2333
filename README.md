@@ -38,5 +38,5 @@ Tenemos de base un ciclo `while` que avanza de a un `tick` hasta que la variable
 
 El simulador garantiza **0 leaks de memoria** al finalizar su ejecución:
 * Se crearon las funciones modulares `crear_queue` y `liberar_queue`.
-* Todos los procesos se guardan inicialmente en un arreglo maestro `todos_los_procesos`.
+* Todos los procesos se guardan inicialmente en un arreglo `todos_los_procesos`.
 * Cuando termina el `while`, el programa imprime el archivo CSV y luego libera los arreglos internos de las colas, las estructuras de las colas, cada proceso individual pedido con `malloc`, y finalmente el arreglo de procesos.
